@@ -38,7 +38,7 @@ import { trigger, transition, style, animate, query, stagger } from '@angular/an
           <div class="logo-icon animate-float">
             <img src="assets/mobile_logo.png" alt="FitTrack Pro" class="logo-img" />
           </div>
-          <h1 class="logo-text">FitTrack <span class="gradient-text">Pro</span></h1>
+          <h1 class="logo-text">Fit<span class="gradient-text">ly</span></h1>
           <p class="logo-sub">Your personal fitness companion</p>
         </div>
 

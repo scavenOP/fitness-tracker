@@ -1,7 +1,8 @@
 import { Injectable, inject, Injector, runInInjectionContext } from '@angular/core';
 import {
   Auth, signInWithEmailAndPassword, createUserWithEmailAndPassword,
-  signOut, user, updateProfile, signInWithRedirect, getRedirectResult, GoogleAuthProvider
+  signOut, user, updateProfile, signInWithRedirect, getRedirectResult,
+  GoogleAuthProvider, browserLocalPersistence, setPersistence
 } from '@angular/fire/auth';
 import { Router } from '@angular/router';
 import { Observable } from 'rxjs';
@@ -49,11 +50,18 @@ export class AuthService {
 
   async loginWithGoogle() {
     const provider = new GoogleAuthProvider();
-    // signInWithPopup breaks in Capacitor WebView — use redirect instead
+    provider.setCustomParameters({ prompt: 'select_account' });
+
+    await runInInjectionContext(this.injector, () =>
+      setPersistence(this.auth, browserLocalPersistence)
+    );
+
+    // Use redirect — works in Capacitor WebView
+    // Firebase will redirect back to https://fittrackpro.app which
+    // Capacitor intercepts and loads inside the app
     await runInInjectionContext(this.injector, () =>
       signInWithRedirect(this.auth, provider)
     );
-    // Page will redirect away — result handled in handleRedirectResult() on return
   }
 
   async logout() {

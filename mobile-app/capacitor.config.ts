@@ -1,11 +1,16 @@
 import { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
-  appId: 'com.fittrackpro.app',
-  appName: 'FitTrack Pro',
+  appId: 'com.fitly.app',
+  appName: 'Fitly',
   webDir: 'dist/fittrack-pro-mobile/browser',
   // App icon source — run `npx capacitor-assets generate` to auto-generate all sizes
   // from src/assets/mobile_logo.png for both Android and iOS
+  server: {
+    androidScheme: 'https',
+    hostname: 'fitly.app',
+    cleartext: true
+  },
   plugins: {
     LocalNotifications: {
       smallIcon: 'ic_stat_icon_config_sample',

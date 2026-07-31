@@ -1,6 +1,6 @@
 {
-  "name": "FitTrack Pro",
-  "short_name": "FitTrack",
+  "name": "Fitly",
+  "short_name": "Fitly",
   "description": "Your personal fitness companion",
   "start_url": "/",
   "display": "standalone",
