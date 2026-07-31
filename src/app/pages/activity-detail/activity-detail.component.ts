@@ -289,7 +289,8 @@ export class ActivityDetailComponent implements OnInit, AfterViewInit {
 
   activity = signal<Activity | null>(null);
   loading = signal(true);
-  private map!: L.Map;
+  private map: L.Map | null = null;
+  private mapInitialized = false;
 
   constructor(private route: ActivatedRoute, private tracking: TrackingService) {}
 
@@ -298,46 +299,59 @@ export class ActivityDetailComponent implements OnInit, AfterViewInit {
     const act = await this.tracking.getActivity(id);
     this.activity.set(act);
     this.loading.set(false);
+    setTimeout(() => this.initMapIfReady(), 0);
   }
 
   ngAfterViewInit() {
-    setTimeout(() => {
-      if (this.activity()) this.initMap();
-    }, 300);
+    setTimeout(() => this.initMapIfReady(), 0);
   }
 
-  private initMap() {
-    const act = this.activity()!;
-    if (!this.mapEl?.nativeElement) return;
+  private initMapIfReady() {
+    const act = this.activity();
+    if (!act || !this.mapEl?.nativeElement || this.mapInitialized) return;
 
+    this.map?.remove();
+    this.map = null;
+
+    this.mapInitialized = true;
     this.map = L.map(this.mapEl.nativeElement, {
-      zoomControl: false, attributionControl: false,
-      dragging: false, scrollWheelZoom: false, doubleClickZoom: false
+      zoomControl: true,
+      attributionControl: false,
+      dragging: true,
+      scrollWheelZoom: true,
+      doubleClickZoom: true,
+      boxZoom: true
     });
 
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(this.map);
 
-    if (act.route?.length > 0) {
-      const points: L.LatLngExpression[] = act.route.map(p => [p.lat, p.lng]);
+    const points: L.LatLngExpression[] = (act.route ?? []).map(p => [p.lat, p.lng]);
+
+    if (points.length > 1) {
       const poly = L.polyline(points, {
         color: '#6C63FF', weight: 5, opacity: 0.9,
         lineCap: 'round', lineJoin: 'round'
       }).addTo(this.map);
 
-      // Start marker
       L.circleMarker(points[0] as L.LatLngExpression, {
         radius: 8, color: '#43E97B', fillColor: '#43E97B', fillOpacity: 1, weight: 2
       }).addTo(this.map).bindTooltip('Start', { permanent: false });
 
-      // End marker
       L.circleMarker(points[points.length - 1] as L.LatLngExpression, {
         radius: 8, color: '#FF6584', fillColor: '#FF6584', fillOpacity: 1, weight: 2
       }).addTo(this.map).bindTooltip('End', { permanent: false });
 
       this.map.fitBounds(poly.getBounds(), { padding: [20, 20] });
+    } else if (points.length === 1) {
+      this.map.setView(points[0], 15);
+      L.circleMarker(points[0] as L.LatLngExpression, {
+        radius: 8, color: '#43E97B', fillColor: '#43E97B', fillOpacity: 1, weight: 2
+      }).addTo(this.map);
     } else {
       this.map.setView([20, 0], 2);
     }
+
+    setTimeout(() => this.map?.invalidateSize(), 0);
   }
 
   detailStats() {
