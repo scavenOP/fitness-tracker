@@ -56,12 +56,19 @@ export class AuthService {
       setPersistence(this.auth, browserLocalPersistence)
     );
 
-    // Use redirect — works in Capacitor WebView
-    // Firebase will redirect back to https://fittrackpro.app which
-    // Capacitor intercepts and loads inside the app
-    await runInInjectionContext(this.injector, () =>
-      signInWithRedirect(this.auth, provider)
-    );
+    if (Capacitor.isNativePlatform()) {
+      // Native: use redirect — popup doesn't work in Capacitor WebView
+      await runInInjectionContext(this.injector, () =>
+        signInWithRedirect(this.auth, provider)
+      );
+    } else {
+      // Web browser: use popup
+      const { signInWithPopup } = await import('@angular/fire/auth');
+      const result = await runInInjectionContext(this.injector, () =>
+        signInWithPopup(this.auth, provider)
+      );
+      if (result.user) this.router.navigate(['/dashboard']);
+    }
   }
 
   async logout() {

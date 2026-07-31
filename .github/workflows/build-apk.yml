@@ -52,6 +52,9 @@ jobs:
         run: npx cap add android
         working-directory: mobile-app
 
+      - name: Copy google-services.json
+        run: cp mobile-app/google-services.json mobile-app/android/app/google-services.json
+
       - name: Generate Android app icons from logo
         run: |
           npm install sharp

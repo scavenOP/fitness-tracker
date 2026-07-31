@@ -348,14 +348,12 @@ export class AuthComponent {
     this.googleLoading.set(true);
     this.loading.set(true);
     try {
-      // Triggers a full-page redirect to Google — page will reload on return
       await this.auth.loginWithGoogle();
     } catch (e: any) {
-      this.error.set(this.parseError(e.code));
+      this.error.set(this.parseError(e.code) + (e.code ? ` (${e.code})` : ''));
       this.googleLoading.set(false);
       this.loading.set(false);
     }
-    // Note: loading stays true intentionally — page is redirecting away
   }
 
   async submit() {
