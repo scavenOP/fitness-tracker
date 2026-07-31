@@ -1,5 +1,5 @@
-import { Injectable, inject } from '@angular/core';
-import { Database, ref, push, set, get, query, orderByChild, equalTo } from '@angular/fire/database';
+import { Injectable, inject, Injector, runInInjectionContext } from '@angular/core';
+import { Database, ref, push, set, get } from '@angular/fire/database';
 import { AuthService } from './auth.service';
 import { BehaviorSubject } from 'rxjs';
 
@@ -36,6 +36,7 @@ export interface LiveStats {
 export class TrackingService {
   private db = inject(Database);
   private authService = inject(AuthService);
+  private injector = inject(Injector);
 
   private watchId: number | null = null;
   private timerInterval: any = null;
@@ -123,8 +124,8 @@ export class TrackingService {
     };
 
     const activitiesRef = ref(this.db, `activities/${this.authService.uid}`);
-    const newRef = push(activitiesRef);
-    await set(newRef, activity);
+    const newRef = await runInInjectionContext(this.injector, () => push(activitiesRef));
+    await runInInjectionContext(this.injector, () => set(newRef, activity));
     return newRef.key!;
   }
 
@@ -132,7 +133,7 @@ export class TrackingService {
     const uid = this.authService.uid;
     if (!uid) return [];
     const activitiesRef = ref(this.db, `activities/${uid}`);
-    const snap = await get(activitiesRef);
+    const snap = await runInInjectionContext(this.injector, () => get(activitiesRef));
     if (!snap.exists()) return [];
     const data = snap.val();
     return Object.entries(data).map(([id, val]: any) => ({ id, ...val }))
@@ -143,7 +144,7 @@ export class TrackingService {
     const uid = this.authService.uid;
     if (!uid) return null;
     const actRef = ref(this.db, `activities/${uid}/${id}`);
-    const snap = await get(actRef);
+    const snap = await runInInjectionContext(this.injector, () => get(actRef));
     return snap.exists() ? { id, ...snap.val() } : null;
   }
 

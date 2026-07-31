@@ -26,7 +26,6 @@ import { trigger, transition, style, animate, query, stagger } from '@angular/an
   ],
   template: `
     <div class="auth-page">
-      <!-- Animated background -->
       <div class="bg-orbs">
         <div class="orb orb1"></div>
         <div class="orb orb2"></div>
@@ -41,6 +40,28 @@ import { trigger, transition, style, animate, query, stagger } from '@angular/an
           <p class="logo-sub">Your personal fitness companion</p>
         </div>
 
+        <!-- Google button -->
+        <button class="btn-google" (click)="loginGoogle()" [disabled]="loading()">
+          @if (googleLoading()) {
+            <span class="spinner-sm dark"></span>
+          } @else {
+            <svg width="20" height="20" viewBox="0 0 48 48">
+              <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
+              <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
+              <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
+              <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.18 1.48-4.97 2.31-8.16 2.31-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
+            </svg>
+          }
+          <span>{{ isSignup() ? 'Sign up with Google' : 'Continue with Google' }}</span>
+        </button>
+
+        <!-- Divider -->
+        <div class="divider-row">
+          <div class="divider-line"></div>
+          <span class="divider-text">or with email</span>
+          <div class="divider-line"></div>
+        </div>
+
         <!-- Tab switcher -->
         <div class="tab-switcher">
           <button class="tab-btn" [class.active]="!isSignup()" (click)="isSignup.set(false)">Login</button>
@@ -48,7 +69,7 @@ import { trigger, transition, style, animate, query, stagger } from '@angular/an
           <div class="tab-indicator" [style.transform]="isSignup() ? 'translateX(100%)' : 'translateX(0)'"></div>
         </div>
 
-        <!-- Form -->
+        <!-- Email/password form -->
         <form class="auth-form" @staggerIn (ngSubmit)="submit()">
           @if (isSignup()) {
             <div class="input-group stagger-item">
@@ -85,7 +106,7 @@ import { trigger, transition, style, animate, query, stagger } from '@angular/an
           }
 
           <button type="submit" class="btn btn-primary btn-lg stagger-item" [disabled]="loading()">
-            @if (loading()) {
+            @if (loading() && !googleLoading()) {
               <span class="spinner-sm"></span>
             } @else {
               {{ isSignup() ? '🚀 Create Account' : '⚡ Login' }}
@@ -93,7 +114,7 @@ import { trigger, transition, style, animate, query, stagger } from '@angular/an
           </button>
         </form>
 
-        <!-- Features preview -->
+        <!-- Features -->
         <div class="features-row">
           @for (f of features; track f.icon) {
             <div class="feature-chip">
@@ -115,13 +136,10 @@ import { trigger, transition, style, animate, query, stagger } from '@angular/an
       position: relative;
       overflow: hidden;
       background: var(--bg);
+      overflow-y: auto;
     }
 
-    .bg-orbs {
-      position: absolute;
-      inset: 0;
-      pointer-events: none;
-    }
+    .bg-orbs { position: absolute; inset: 0; pointer-events: none; }
 
     .orb {
       position: absolute;
@@ -130,35 +148,19 @@ import { trigger, transition, style, animate, query, stagger } from '@angular/an
       opacity: 0.15;
     }
 
-    .orb1 {
-      width: 400px; height: 400px;
-      background: var(--primary);
-      top: -100px; left: -100px;
-      animation: float 6s ease-in-out infinite;
-    }
-
-    .orb2 {
-      width: 300px; height: 300px;
-      background: var(--secondary);
-      bottom: -50px; right: -50px;
-      animation: float 8s ease-in-out infinite reverse;
-    }
-
-    .orb3 {
-      width: 200px; height: 200px;
-      background: var(--accent);
-      top: 50%; left: 50%;
-      animation: float 5s ease-in-out infinite 2s;
-    }
+    .orb1 { width: 400px; height: 400px; background: var(--primary); top: -100px; left: -100px; animation: float 6s ease-in-out infinite; }
+    .orb2 { width: 300px; height: 300px; background: var(--secondary); bottom: -50px; right: -50px; animation: float 8s ease-in-out infinite reverse; }
+    .orb3 { width: 200px; height: 200px; background: var(--accent); top: 50%; left: 50%; animation: float 5s ease-in-out infinite 2s; }
 
     .auth-container {
       width: 100%;
       max-width: 420px;
       display: flex;
       flex-direction: column;
-      gap: 24px;
+      gap: 20px;
       position: relative;
       z-index: 1;
+      padding: 20px 0;
     }
 
     .logo-section {
@@ -169,23 +171,55 @@ import { trigger, transition, style, animate, query, stagger } from '@angular/an
       gap: 8px;
     }
 
-    .logo-icon {
-      font-size: 56px;
-      line-height: 1;
-      filter: drop-shadow(0 0 20px rgba(108,99,255,0.5));
+    .logo-icon { font-size: 56px; line-height: 1; filter: drop-shadow(0 0 20px rgba(108,99,255,0.5)); }
+    .logo-text { font-size: 32px; font-weight: 800; color: var(--text); }
+    .logo-sub { color: var(--text2); font-size: 14px; }
+
+    /* Google button */
+    .btn-google {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      width: 100%;
+      padding: 14px 20px;
+      background: white;
+      border: none;
+      border-radius: 50px;
+      font-family: 'Inter', sans-serif;
+      font-size: 15px;
+      font-weight: 600;
+      color: #1a1a2e;
+      cursor: pointer;
+      transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+      box-shadow: 0 4px 20px rgba(0,0,0,0.25);
+
+      &:hover { transform: translateY(-2px); box-shadow: 0 8px 30px rgba(0,0,0,0.3); }
+      &:active { transform: scale(0.97); }
+      &:disabled { opacity: 0.7; cursor: not-allowed; transform: none; }
     }
 
-    .logo-text {
-      font-size: 32px;
-      font-weight: 800;
-      color: var(--text);
+    /* Divider */
+    .divider-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
     }
 
-    .logo-sub {
-      color: var(--text2);
-      font-size: 14px;
+    .divider-line {
+      flex: 1;
+      height: 1px;
+      background: var(--border);
     }
 
+    .divider-text {
+      font-size: 12px;
+      color: var(--text3);
+      font-weight: 500;
+      white-space: nowrap;
+    }
+
+    /* Tab switcher */
     .tab-switcher {
       display: flex;
       background: var(--card);
@@ -209,14 +243,12 @@ import { trigger, transition, style, animate, query, stagger } from '@angular/an
       position: relative;
       z-index: 1;
       transition: color 0.3s;
-
       &.active { color: white; }
     }
 
     .tab-indicator {
       position: absolute;
-      top: 4px; bottom: 4px;
-      left: 4px;
+      top: 4px; bottom: 4px; left: 4px;
       width: calc(50% - 4px);
       background: linear-gradient(135deg, var(--primary), var(--primary-dark));
       border-radius: 50px;
@@ -224,6 +256,7 @@ import { trigger, transition, style, animate, query, stagger } from '@angular/an
       box-shadow: 0 4px 15px rgba(108,99,255,0.4);
     }
 
+    /* Form */
     .auth-form {
       display: flex;
       flex-direction: column;
@@ -239,27 +272,9 @@ import { trigger, transition, style, animate, query, stagger } from '@angular/an
       display: flex;
       align-items: center;
 
-      .input-icon {
-        position: absolute;
-        left: 14px;
-        font-size: 16px;
-        pointer-events: none;
-      }
-
-      input {
-        padding-left: 44px !important;
-        padding-right: 44px !important;
-      }
-
-      .pass-toggle {
-        position: absolute;
-        right: 12px;
-        background: none;
-        border: none;
-        cursor: pointer;
-        font-size: 16px;
-        padding: 4px;
-      }
+      .input-icon { position: absolute; left: 14px; font-size: 16px; pointer-events: none; }
+      input { padding-left: 44px !important; padding-right: 44px !important; }
+      .pass-toggle { position: absolute; right: 12px; background: none; border: none; cursor: pointer; font-size: 16px; padding: 4px; }
     }
 
     .error-msg {
@@ -277,6 +292,11 @@ import { trigger, transition, style, animate, query, stagger } from '@angular/an
       border-top-color: white;
       border-radius: 50%;
       animation: spin 0.8s linear infinite;
+
+      &.dark {
+        border-color: rgba(0,0,0,0.15);
+        border-top-color: #333;
+      }
     }
 
     .features-row {
@@ -303,6 +323,7 @@ import { trigger, transition, style, animate, query, stagger } from '@angular/an
 export class AuthComponent {
   isSignup = signal(false);
   loading = signal(false);
+  googleLoading = signal(false);
   error = signal('');
 
   email = '';
@@ -318,6 +339,21 @@ export class AuthComponent {
   ];
 
   constructor(private auth: AuthService) {}
+
+  async loginGoogle() {
+    this.error.set('');
+    this.googleLoading.set(true);
+    this.loading.set(true);
+    try {
+      // Triggers a full-page redirect to Google — page will reload on return
+      await this.auth.loginWithGoogle();
+    } catch (e: any) {
+      this.error.set(this.parseError(e.code));
+      this.googleLoading.set(false);
+      this.loading.set(false);
+    }
+    // Note: loading stays true intentionally — page is redirecting away
+  }
 
   async submit() {
     this.error.set('');

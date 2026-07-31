@@ -1,5 +1,10 @@
-import { Injectable, inject } from '@angular/core';
-import { Auth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, user, updateProfile } from '@angular/fire/auth';
+import { Injectable, inject, Injector, runInInjectionContext } from '@angular/core';
+import {
+  Auth, signInWithEmailAndPassword, createUserWithEmailAndPassword,
+  signOut, user, updateProfile, signInWithRedirect, getRedirectResult,
+  GoogleAuthProvider
+} from '@angular/fire/auth';
+import { Database, ref, get, push, set } from '@angular/fire/database';
 import { Router } from '@angular/router';
 import { Observable } from 'rxjs';
 
@@ -7,6 +12,7 @@ import { Observable } from 'rxjs';
 export class AuthService {
   private auth = inject(Auth);
   private router = inject(Router);
+  private injector = inject(Injector);
 
   user$: Observable<any> = user(this.auth);
 
@@ -14,20 +20,54 @@ export class AuthService {
   get uid() { return this.auth.currentUser?.uid; }
 
   async login(email: string, password: string) {
-    const cred = await signInWithEmailAndPassword(this.auth, email, password);
+    await runInInjectionContext(this.injector, () =>
+      signInWithEmailAndPassword(this.auth, email, password)
+    );
     this.router.navigate(['/dashboard']);
-    return cred;
   }
 
   async signup(email: string, password: string, displayName: string) {
-    const cred = await createUserWithEmailAndPassword(this.auth, email, password);
+    const cred = await runInInjectionContext(this.injector, () =>
+      createUserWithEmailAndPassword(this.auth, email, password)
+    );
     await updateProfile(cred.user, { displayName });
     this.router.navigate(['/dashboard']);
-    return cred;
+  }
+
+  /**
+   * Uses redirect (not popup) to avoid COOP header issues on Cloudflare/strict origins.
+   * Call checkRedirectResult() on app init to handle the return.
+   */
+  async loginWithGoogle() {
+    const provider = new GoogleAuthProvider();
+    await runInInjectionContext(this.injector, () =>
+      signInWithRedirect(this.auth, provider)
+    );
+  }
+
+  /** Call once on app startup — handles the redirect result after Google login */
+  async checkRedirectResult() {
+    try {
+      const result = await runInInjectionContext(this.injector, () =>
+        getRedirectResult(this.auth)
+      );
+      if (result?.user) {
+        this.router.navigate(['/dashboard']);
+      }
+    } catch (_) {}
   }
 
   async logout() {
-    await signOut(this.auth);
+    await runInInjectionContext(this.injector, () => signOut(this.auth));
     this.router.navigate(['/auth']);
+  }
+
+  /** Helper for services that call Firebase DB outside component context */
+  dbGet(dbRef: any) {
+    return runInInjectionContext(this.injector, () => get(dbRef));
+  }
+
+  dbPush(dbRef: any) {
+    return runInInjectionContext(this.injector, () => push(dbRef));
   }
 }
