@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  IMPORTANT: After running `npx cap add ios`, Capacitor generates the real
+  Info.plist at ios/App/App/Info.plist.
+  Add the keys below into that generated file inside the root <dict>.
+-->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+
+    <!-- ── Location permissions ── -->
+    <key>NSLocationWhenInUseUsageDescription</key>
+    <string>FitTrack Pro needs your location to track your route while you exercise.</string>
+
+    <key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+    <string>FitTrack Pro needs background location access to keep tracking when your screen is off.</string>
+
+    <key>NSLocationAlwaysUsageDescription</key>
+    <string>FitTrack Pro needs background location access to keep tracking when your screen is off.</string>
+
+    <!-- ── Background modes ── -->
+    <key>UIBackgroundModes</key>
+    <array>
+        <string>location</string>
+        <string>fetch</string>
+        <string>processing</string>
+    </array>
+
+    <!-- ── Live Activity / Dynamic Island (iOS 16.1+) ── -->
+    <!--
+      True Live Activities require a Widget Extension target in Xcode.
+      The notification-based approach used in this app (LocalNotifications with
+      ongoing:true) shows a persistent banner that updates every 5 seconds —
+      this works on all iOS versions without a Widget Extension.
+
+      To add a real Dynamic Island Live Activity:
+      1. In Xcode → File → New → Target → Widget Extension
+      2. Enable "Include Live Activity" checkbox
+      3. Implement ActivityAttributes in Swift
+      4. Call Activity.request() from a Capacitor plugin or Swift bridge
+
+      For now the persistent notification approach is fully functional.
+    -->
+    <key>NSSupportsLiveActivities</key>
+    <true/>
+
+</dict>
+</plist>

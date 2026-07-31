@@ -1,0 +1,90 @@
+name: Build Android APK on Mobile Folder Changes
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'parking-system-mobile-UI/**'
+  workflow_dispatch:  # Manual trigger with approval
+
+permissions:
+  contents: write
+
+jobs:
+  build-apk:
+    runs-on: ubuntu-latest
+    environment: production  # Requires approval
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '20' # Adjust Node.js version as needed
+
+      - name: Setup Java 21
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+
+      - name: Install Ionic CLI and Capacitor
+        run: npm install -g @ionic/cli @capacitor/core @capacitor/cli @capacitor/android
+
+      - name: Navigate to Mobile app directory
+        run: cd parking-system-mobile-UI
+
+      - name: Install dependencies
+        run: npm install
+        working-directory: parking-system-mobile-UI
+
+      - name: Build web assets
+        run: npm run build # You might have a specific build script in your package.json
+        working-directory: parking-system-mobile-UI
+
+      - name: Check if Android platform exists and remove if present
+        id: check_android_platform
+        run: |
+          if [ -d "parking-system-mobile-UI/android" ]; then
+            echo "Android platform already exists, removing..."
+            rm -rf parking-system-mobile-UI/android
+          fi
+        # No working-directory needed here as we're explicitly checking "Mobile/android"
+
+      - name: Add Android platform
+        run: npx cap add android
+        working-directory: parking-system-mobile-UI
+
+      - name: Sync web assets to Android
+        run: npx cap sync
+        working-directory: parking-system-mobile-UI
+
+      - name: Make gradlew executable and build APK
+        run: chmod +x gradlew && ./gradlew assembleDebug
+        working-directory: parking-system-mobile-UI/android
+
+      - name: Create APK directory in root
+        run: mkdir -p APK
+        # No working-directory here, so it runs at the repo root
+
+      - name: Copy and rename APK
+        run: cp "parking-system-mobile-UI/android/app/build/outputs/apk/debug/app-debug.apk" "APK/Smart-Parking.apk"
+
+      - name: Upload artifact (optional, for debugging/downloading from workflow run)
+        uses: actions/upload-artifact@v4
+        with:
+          name: debug-apk
+          path: APK/Smart-Parking.apk
+
+      - name: Commit and push APK to repository
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "Update Smart-Parking.apk"
+          branch: main
+          file_pattern: 'APK/Smart-Parking.apk'
+          add_options: '-f'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

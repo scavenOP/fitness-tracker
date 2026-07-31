@@ -1,0 +1,89 @@
+name: Build FitTrack Pro APK
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'mobile-app/**'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-apk:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '20'
+
+      - name: Setup Java 21
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+
+      - name: Install Capacitor CLI globally
+        run: npm install -g @capacitor/cli
+
+      - name: Install dependencies
+        run: npm install
+        working-directory: mobile-app
+
+      - name: Build Angular web assets
+        run: npm run build
+        working-directory: mobile-app
+
+      - name: Remove existing Android platform if present
+        run: |
+          if [ -d "mobile-app/android" ]; then
+            echo "Removing existing android folder..."
+            rm -rf mobile-app/android
+          fi
+
+      - name: Add Android platform
+        run: npx cap add android
+        working-directory: mobile-app
+
+      - name: Patch AndroidManifest.xml with required permissions
+        run: |
+          MANIFEST="mobile-app/android/app/src/main/AndroidManifest.xml"
+          sed -i 's|<application|<uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />\n    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />\n    <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />\n    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />\n    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />\n    <uses-permission android:name="android.permission.WAKE_LOCK" />\n    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />\n    <uses-permission android:name="android.permission.INTERNET" />\n    <application|' "$MANIFEST"
+          sed -i 's|</application>|        <service android:name="com.equimaps.capacitor_background_geolocation.BackgroundGeolocationService" android:enabled="true" android:exported="false" android:foregroundServiceType="location" />\n    </application>|' "$MANIFEST"
+
+      - name: Sync web assets to Android
+        run: npx cap sync android
+        working-directory: mobile-app
+
+      - name: Make gradlew executable and build debug APK
+        run: chmod +x gradlew && ./gradlew assembleDebug
+        working-directory: mobile-app/android
+
+      - name: Create APK output directory
+        run: mkdir -p APK
+
+      - name: Copy and rename APK
+        run: cp "mobile-app/android/app/build/outputs/apk/debug/app-debug.apk" "APK/FitTrackPro.apk"
+
+      - name: Upload APK as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: FitTrackPro-APK
+          path: APK/FitTrackPro.apk
+
+      - name: Commit and push APK to repository
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "Build: Update FitTrackPro.apk"
+          branch: main
+          file_pattern: 'APK/FitTrackPro.apk'
+          add_options: '-f'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
