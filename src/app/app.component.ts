@@ -146,9 +146,6 @@ export class AppComponent implements OnInit {
   constructor(private router: Router, private auth: AuthService) {}
 
   ngOnInit() {
-    // Handle Google redirect result on every app load
-    this.auth.checkRedirectResult();
-
     this.router.events.pipe(
       filter(e => e instanceof NavigationEnd)
     ).subscribe((e: any) => {
