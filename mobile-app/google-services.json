@@ -1,0 +1,40 @@
+{
+  "project_info": {
+    "project_number": "1011187607007",
+    "firebase_url": "https://fitness-tracker-3767c-default-rtdb.firebaseio.com",
+    "project_id": "fitness-tracker-3767c",
+    "storage_bucket": "fitness-tracker-3767c.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1011187607007:android:d242e8d8414d80af24906a",
+        "android_client_info": {
+          "package_name": "com.fitly.app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "1011187607007-34hmqenbn4262d5oo9cqnk46689fal1m.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAHy01mut1RFJtdIfZ9eiTMtS5vLPWqc2w"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "1011187607007-34hmqenbn4262d5oo9cqnk46689fal1m.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
