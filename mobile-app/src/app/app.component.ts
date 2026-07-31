@@ -133,6 +133,9 @@ export class AppComponent implements OnInit {
   constructor(private router: Router, private auth: AuthService) {}
 
   ngOnInit() {
+    // Handle Google redirect result when app resumes after OAuth
+    this.auth.handleRedirectResult();
+
     this.router.events.pipe(
       filter(e => e instanceof NavigationEnd)
     ).subscribe((e: any) => {

@@ -71,7 +71,11 @@ jobs:
         working-directory: mobile-app
 
       - name: Make gradlew executable and build debug APK
-        run: chmod +x gradlew && ./gradlew assembleDebug
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleDebug
+          echo "--- DEBUG SHA-1 FINGERPRINT ---"
+          ./gradlew signingReport 2>&1 | grep -A 3 "Variant: debug"
         working-directory: mobile-app/android
 
       - name: Create APK output directory

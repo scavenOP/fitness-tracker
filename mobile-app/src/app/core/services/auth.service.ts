@@ -1,10 +1,11 @@
 import { Injectable, inject, Injector, runInInjectionContext } from '@angular/core';
 import {
   Auth, signInWithEmailAndPassword, createUserWithEmailAndPassword,
-  signOut, user, updateProfile, signInWithPopup, GoogleAuthProvider
+  signOut, user, updateProfile, signInWithRedirect, getRedirectResult, GoogleAuthProvider
 } from '@angular/fire/auth';
 import { Router } from '@angular/router';
 import { Observable } from 'rxjs';
+import { Capacitor } from '@capacitor/core';
 
 @Injectable({ providedIn: 'root' })
 export class AuthService {
@@ -16,6 +17,20 @@ export class AuthService {
 
   get currentUser() { return this.auth.currentUser; }
   get uid() { return this.auth.currentUser?.uid; }
+
+  // Call this on app startup to handle redirect result after Google login
+  async handleRedirectResult() {
+    try {
+      const result = await runInInjectionContext(this.injector, () =>
+        getRedirectResult(this.auth)
+      );
+      if (result?.user) {
+        this.router.navigate(['/dashboard']);
+      }
+    } catch (e) {
+      console.error('Redirect result error', e);
+    }
+  }
 
   async login(email: string, password: string) {
     await runInInjectionContext(this.injector, () =>
@@ -34,12 +49,11 @@ export class AuthService {
 
   async loginWithGoogle() {
     const provider = new GoogleAuthProvider();
-    const result = await runInInjectionContext(this.injector, () =>
-      signInWithPopup(this.auth, provider)
+    // signInWithPopup breaks in Capacitor WebView — use redirect instead
+    await runInInjectionContext(this.injector, () =>
+      signInWithRedirect(this.auth, provider)
     );
-    if (result.user) {
-      this.router.navigate(['/dashboard']);
-    }
+    // Page will redirect away — result handled in handleRedirectResult() on return
   }
 
   async logout() {
