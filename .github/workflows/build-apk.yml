@@ -52,18 +52,37 @@ jobs:
         run: npx cap add android
         working-directory: mobile-app
 
+      - name: Generate Android app icons from logo
+        run: |
+          npm install sharp
+          node -e "
+          const sharp = require('sharp');
+          const fs = require('fs');
+          const src = 'mobile-app/src/assets/mobile_logo.png';
+          const base = 'mobile-app/android/app/src/main/res';
+          const sizes = [
+            { dir: 'mipmap-mdpi',    size: 48  },
+            { dir: 'mipmap-hdpi',    size: 72  },
+            { dir: 'mipmap-xhdpi',   size: 96  },
+            { dir: 'mipmap-xxhdpi',  size: 144 },
+            { dir: 'mipmap-xxxhdpi', size: 192 },
+          ];
+          Promise.all(sizes.map(({ dir, size }) => {
+            const out = base + '/' + dir;
+            fs.mkdirSync(out, { recursive: true });
+            return sharp(src).resize(size, size).toFile(out + '/ic_launcher.png')
+              .then(() => sharp(src).resize(size, size).toFile(out + '/ic_launcher_round.png'));
+          })).then(() => console.log('Icons generated')).catch(e => { console.error(e); process.exit(1); });
+          "
+
       - name: Patch AndroidManifest.xml
         run: |
           MANIFEST="mobile-app/android/app/src/main/AndroidManifest.xml"
 
-          # Add xmlns:tools to root manifest element
           sed -i 's|xmlns:android="http://schemas.android.com/apk/res/android"|xmlns:android="http://schemas.android.com/apk/res/android" xmlns:tools="http://schemas.android.com/tools"|' "$MANIFEST"
 
-          # Inject location + foreground service permissions before <application
-          # Skip INTERNET — Capacitor already adds it
           sed -i 's|<application|<uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />\n    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />\n    <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />\n    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />\n    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />\n    <uses-permission android:name="android.permission.WAKE_LOCK" />\n    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />\n    <application|' "$MANIFEST"
 
-          # Inject BackgroundGeolocation service with tools:replace to fix exported conflict
           sed -i 's|</application>|        <service\n            android:name="com.equimaps.capacitor_background_geolocation.BackgroundGeolocationService"\n            android:enabled="true"\n            android:exported="true"\n            android:foregroundServiceType="location"\n            tools:replace="android:exported" />\n    </application>|' "$MANIFEST"
 
       - name: Sync web assets to Android
