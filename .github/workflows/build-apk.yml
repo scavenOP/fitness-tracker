@@ -52,11 +52,19 @@ jobs:
         run: npx cap add android
         working-directory: mobile-app
 
-      - name: Patch AndroidManifest.xml with required permissions
+      - name: Patch AndroidManifest.xml
         run: |
           MANIFEST="mobile-app/android/app/src/main/AndroidManifest.xml"
-          sed -i 's|<application|<uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />\n    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />\n    <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />\n    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />\n    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />\n    <uses-permission android:name="android.permission.WAKE_LOCK" />\n    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />\n    <uses-permission android:name="android.permission.INTERNET" />\n    <application|' "$MANIFEST"
-          sed -i 's|</application>|        <service android:name="com.equimaps.capacitor_background_geolocation.BackgroundGeolocationService" android:enabled="true" android:exported="false" android:foregroundServiceType="location" />\n    </application>|' "$MANIFEST"
+
+          # Add xmlns:tools to root manifest element
+          sed -i 's|xmlns:android="http://schemas.android.com/apk/res/android"|xmlns:android="http://schemas.android.com/apk/res/android" xmlns:tools="http://schemas.android.com/tools"|' "$MANIFEST"
+
+          # Inject location + foreground service permissions before <application
+          # Skip INTERNET — Capacitor already adds it
+          sed -i 's|<application|<uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />\n    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />\n    <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />\n    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />\n    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />\n    <uses-permission android:name="android.permission.WAKE_LOCK" />\n    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />\n    <application|' "$MANIFEST"
+
+          # Inject BackgroundGeolocation service with tools:replace to fix exported conflict
+          sed -i 's|</application>|        <service\n            android:name="com.equimaps.capacitor_background_geolocation.BackgroundGeolocationService"\n            android:enabled="true"\n            android:exported="true"\n            android:foregroundServiceType="location"\n            tools:replace="android:exported" />\n    </application>|' "$MANIFEST"
 
       - name: Sync web assets to Android
         run: npx cap sync android
