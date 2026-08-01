@@ -152,7 +152,7 @@ jobs:
           echo "================================================"
           echo "         DEBUG KEYSTORE SHA-1 FINGERPRINT"
           echo "================================================"
-          ./gradlew signingReport 2>&1 | grep -A 5 "Variant: debug"
+          keytool -list -v -keystore $HOME/.android/debug.keystore -alias androiddebugkey -storepass android 2>&1 | grep "SHA1:"
           echo "================================================"
         working-directory: mobile-app/android
 
