@@ -72,13 +72,13 @@ export class AuthService {
         });
         this.log.info('GoogleAuth: initialized');
         const googleUser = await GoogleAuth.signIn();
-        this.log.info('GoogleAuth: got user', googleUser?.email);
+        this.log.info('GoogleAuth: got user email=' + googleUser?.email + ' idToken=' + (googleUser?.authentication?.idToken ? 'YES' : 'NO') + ' accessToken=' + (googleUser?.authentication?.accessToken ? 'YES' : 'NO'));
         const credential = GoogleAuthProvider.credential(googleUser.authentication.idToken);
         const result = await signInWithCredential(this.auth, credential);
         this.log.info('Firebase signIn success', result.user?.email);
         if (result.user) this.router.navigate(['/dashboard']);
       } catch (e: any) {
-        this.log.error('GoogleAuth native error:', e?.code, e?.message, JSON.stringify(e));
+        this.log.error('FULL ERROR: code=' + e?.code + ' msg=' + e?.message + ' status=' + e?.status + ' details=' + JSON.stringify(e));
         throw e;
       }
     } else {
