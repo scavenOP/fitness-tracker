@@ -26,6 +26,10 @@ interface ChartBar { label: string; steps: number; pct: number; isToday: boolean
       <!-- Header -->
       <header class="dash-header glass">
         <div class="header-left">
+          <div class="header-brand">
+            <img src="/assets/mobile_logo.png" alt="Fitly" class="header-logo" />
+            <span class="header-app-name">Fitly</span>
+          </div>
           <p class="greeting">{{ greeting }}, 👋</p>
           <h2 class="user-name">{{ userName() }}</h2>
         </div>
@@ -144,6 +148,29 @@ interface ChartBar { label: string; steps: number; pct: number; isToday: boolean
       padding-top: calc(16px + env(safe-area-inset-top, 0));
       border-bottom: 1px solid var(--border);
       flex-shrink: 0;
+    }
+
+    .header-brand {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 4px;
+    }
+
+    .header-logo {
+      width: 28px; height: 28px;
+      border-radius: 8px;
+      object-fit: cover;
+    }
+
+    .header-app-name {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 15px;
+      font-weight: 700;
+      background: linear-gradient(135deg, var(--primary-light), var(--accent));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
     }
 
     .greeting { font-size: 13px; color: var(--text2); margin-bottom: 2px; }

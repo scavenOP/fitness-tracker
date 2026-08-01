@@ -149,7 +149,8 @@ export class AppComponent implements OnInit {
     this.router.events.pipe(
       filter(e => e instanceof NavigationEnd)
     ).subscribe((e: any) => {
-      this.showNav = !e.url.includes('/auth');
+      const url = e.url;
+      this.showNav = !url.includes('/auth') && url !== '/' && url !== '';
     });
   }
 }

@@ -75,20 +75,26 @@ export class TrackingService {
       route: [], currentPos: null
     });
 
-    this.timerInterval = setInterval(() => {
-      const s = this.stats$.value;
-      const newDuration = Math.floor((Date.now() - this.startTime) / 1000);
-      this.stats$.next({ ...s, duration: newDuration });
-      // Update live notification every 5 seconds
-      if (newDuration % 5 === 0) this.updateLiveNotification(s, newDuration);
-    }, 1000);
-
     await this.requestNotificationPermission();
     await this.showLiveNotification(type);
 
     if (this.isNative) {
+      // On native: timer runs inside the BG geolocation callback (survives background)
+      // Also start a fallback interval for duration-only updates when GPS hasn't fired
+      this.timerInterval = setInterval(() => {
+        const s = this.stats$.value;
+        const newDuration = Math.floor((Date.now() - this.startTime) / 1000);
+        this.zone.run(() => this.stats$.next({ ...s, duration: newDuration }));
+        if (newDuration % 5 === 0) this.updateLiveNotification({ ...s, duration: newDuration });
+      }, 1000);
       await this.startNativeTracking(type);
     } else {
+      this.timerInterval = setInterval(() => {
+        const s = this.stats$.value;
+        const newDuration = Math.floor((Date.now() - this.startTime) / 1000);
+        this.stats$.next({ ...s, duration: newDuration });
+        if (newDuration % 5 === 0) this.updateLiveNotification({ ...s, duration: newDuration });
+      }, 1000);
       this.startWebTracking(type);
     }
   }
@@ -113,7 +119,7 @@ export class TrackingService {
       bgGeoWatcherId = await BackgroundGeolocation.addWatcher(
         {
           backgroundMessage: `FitTrack is tracking your ${type}`,
-          backgroundTitle: 'FitTrack Pro — Live Tracking',
+          backgroundTitle: 'Fitly — Live Tracking',
           requestPermissions: true,
           stale: false,
           distanceFilter: 5
@@ -122,6 +128,9 @@ export class TrackingService {
           if (error) { console.error(error); return; }
           this.zone.run(() => {
             this.onPosition(location.latitude, location.longitude, location.speed, type);
+            // Update notification on every GPS fix (already silent channel)
+            const s = this.stats$.value;
+            this.updateLiveNotification(s);
           });
         }
       );
@@ -134,6 +143,7 @@ export class TrackingService {
   private onPosition(lat: number, lng: number, speed: number | null, type: 'walk' | 'run') {
     const s = this.stats$.value;
     const speedKmh = speed != null && speed > 0 ? speed * 3.6 : 0;
+    const duration = Math.floor((Date.now() - this.startTime) / 1000);
 
     let addedDist = 0;
     if (this.lastPos) {
@@ -151,6 +161,7 @@ export class TrackingService {
 
     this.stats$.next({
       ...s,
+      duration,
       distance: newDist,
       currentSpeed: speedKmh,
       avgSpeed,
@@ -227,6 +238,17 @@ export class TrackingService {
 
   private async requestNotificationPermission() {
     try {
+      // Ensure silent channel exists before any notification is shown
+      if (this.isNative) {
+        await LocalNotifications.deleteChannel({ id: 'fittrack_live' }).catch(() => {});
+        await LocalNotifications.createChannel({
+          id: 'fittrack_live',
+          name: 'Live Tracking',
+          importance: 2,   // IMPORTANCE_LOW: shows in shade, zero sound/vibration
+          vibration: false,
+          lights: false
+        });
+      }
       const perm = await LocalNotifications.requestPermissions();
       return perm.display === 'granted';
     } catch (_) { return false; }
@@ -237,7 +259,7 @@ export class TrackingService {
       await LocalNotifications.schedule({
         notifications: [{
           id: this.NOTIF_ID,
-          title: `FitTrack Pro — ${type === 'run' ? '🏃 Running' : '🚶 Walking'}`,
+          title: `Fitly — ${type === 'run' ? '🏃 Running' : '🚶 Walking'}`,
           body: 'Starting... tap to open',
           ongoing: true,
           autoCancel: false,
@@ -252,8 +274,9 @@ export class TrackingService {
     }
   }
 
-  private async updateLiveNotification(s: LiveStats, duration: number) {
+  private async updateLiveNotification(s: LiveStats) {
     try {
+      const duration = s.duration ?? Math.floor((Date.now() - this.startTime) / 1000);
       const dist = s.distance >= 1000
         ? (s.distance / 1000).toFixed(2) + ' km'
         : Math.round(s.distance) + ' m';
@@ -261,16 +284,18 @@ export class TrackingService {
       const secs = duration % 60;
       const timeStr = `${mins}:${secs.toString().padStart(2, '0')}`;
 
+      // Schedule with same ID — Android updates in-place (no cancel) when channel is IMPORTANCE_LOW
       await LocalNotifications.schedule({
         notifications: [{
           id: this.NOTIF_ID,
-          title: `FitTrack Pro — ${this.activityType === 'run' ? '🏃 Running' : '🚶 Walking'}`,
+          title: `Fitly — ${this.activityType === 'run' ? '🏃 Running' : '🚶 Walking'}`,
           body: `⏱ ${timeStr}  📍 ${dist}  🔥 ${s.calories} kcal  👟 ${s.steps} steps`,
           ongoing: true,
           autoCancel: false,
           smallIcon: 'ic_stat_directions_run',
           iconColor: '#6C63FF',
-          channelId: 'fittrack_live'
+          channelId: 'fittrack_live',
+          silent: true
         }]
       });
     } catch (_) {}

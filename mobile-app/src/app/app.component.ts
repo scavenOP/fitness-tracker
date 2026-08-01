@@ -221,11 +221,13 @@ export class AppComponent implements OnInit {
   private async registerSilentChannel() {
     if (!Capacitor.isNativePlatform()) return;
     try {
+      // Delete old channel first (Android caches importance, must recreate to change it)
+      await LocalNotifications.deleteChannel({ id: 'fittrack_live' }).catch(() => {});
       await LocalNotifications.createChannel({
         id: 'fittrack_live',
         name: 'Live Tracking',
-        importance: 3,       // DEFAULT importance — shows but no sound
-        sound: undefined,    // no sound
+        importance: 2,    // IMPORTANCE_LOW — no sound, no vibration
+        sound: undefined,
         vibration: false,
         lights: false
       });
