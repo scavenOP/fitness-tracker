@@ -23,6 +23,14 @@
           }
         },
         {
+          "client_id": "1011187607007-om4k0ihotpf3nna4fakd3iqvfj0nvu3c.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.fitly.app",
+            "certificate_hash": "8232a2b6ab43c4bbebc8de359089ccad63388ccb"
+          }
+        },
+        {
           "client_id": "1011187607007-34hmqenbn4262d5oo9cqnk46689fal1m.apps.googleusercontent.com",
           "client_type": 3
         }
