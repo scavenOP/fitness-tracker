@@ -127,8 +127,14 @@ jobs:
             echo ""
           fi
 
+      - name: Print build.gradle before patch
+        run: cat mobile-app/android/app/build.gradle
+
       - name: Patch build.gradle signing config
         run: python3 scripts/patch_gradle.py
+
+      - name: Print build.gradle after patch
+        run: cat mobile-app/android/app/build.gradle
 
       - name: Make gradlew executable and build debug APK
         run: |
