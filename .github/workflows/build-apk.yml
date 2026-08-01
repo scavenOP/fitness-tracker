@@ -149,27 +149,27 @@ jobs:
             echo "================================================"
           fi
           # Patch Gradle to explicitly use our keystore for debug builds
-          python3 -c "
-import re
-gradle = open('mobile-app/android/app/build.gradle').read()
-patch = '''
-signingConfigs {
-    debug {
-        storeFile file(System.getProperty(\"user.home\") + \"/.android/debug.keystore\")
-        storePassword \"android\"
-        keyAlias \"androiddebugkey\"
-        keyPassword \"android\"
-    }
-}
-'''
+          cat > /tmp/patch_gradle.py << 'PYEOF'
+import sys
+path = 'mobile-app/android/app/build.gradle'
+gradle = open(path).read()
 if 'signingConfigs' not in gradle:
+    patch = ('\nsigningConfigs {\n'
+             '    debug {\n'
+             '        storeFile file(System.getProperty("user.home") + "/.android/debug.keystore")\n'
+             '        storePassword "android"\n'
+             '        keyAlias "androiddebugkey"\n'
+             '        keyPassword "android"\n'
+             '    }\n'
+             '}\n')
     gradle = gradle.replace('android {', 'android {' + patch, 1)
     gradle = gradle.replace('debug {', 'debug {\n            signingConfig signingConfigs.debug', 1)
-    open('mobile-app/android/app/build.gradle', 'w').write(gradle)
+    open(path, 'w').write(gradle)
     print('Gradle patched')
 else:
     print('Gradle already patched')
-"
+PYEOF
+          python3 /tmp/patch_gradle.py
           echo "✅ Gradle patched to use fixed keystore"
 
       - name: Make gradlew executable and build debug APK
