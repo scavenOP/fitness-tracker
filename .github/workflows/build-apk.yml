@@ -149,11 +149,8 @@ jobs:
 
       - name: Print SHA-1 fingerprint
         run: |
-          echo "================================================"
-          echo "         DEBUG KEYSTORE SHA-1 FINGERPRINT"
-          echo "================================================"
-          keytool -list -v -keystore $HOME/.android/debug.keystore -storepass android 2>&1 | grep "SHA1:"
-          echo "================================================"
+          keytool -list -v -keystore $HOME/.android/debug.keystore -storepass android || true
+          keytool -list -v -keystore $HOME/.android/debug.keystore -storepass android 2>&1 || true
 
       - name: Create APK output directory
         run: mkdir -p APK
