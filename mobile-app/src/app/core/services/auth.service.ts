@@ -65,7 +65,11 @@ export class AuthService {
       try {
         this.log.info('GoogleAuth: starting native sign-in');
         const { GoogleAuth } = await import('@codetrix-studio/capacitor-google-auth');
-        await GoogleAuth.initialize();
+        await GoogleAuth.initialize({
+          clientId: '1011187607007-34hmqenbn4262d5oo9cqnk46689fal1m.apps.googleusercontent.com',
+          scopes: ['profile', 'email'],
+          grantOfflineAccess: true
+        });
         this.log.info('GoogleAuth: initialized');
         const googleUser = await GoogleAuth.signIn();
         this.log.info('GoogleAuth: got user', googleUser?.email);
