@@ -41,8 +41,28 @@ export class TrackingService {
   private watchId: number | null = null;
   private timerInterval: any = null;
   private startTime = 0;
+  private pausedAt = 0;
+  private totalPausedMs = 0;
+  private paused = false;
   private lastPos: GeolocationPosition | null = null;
   private speedSamples: number[] = [];
+
+  private elapsedSeconds(): number {
+    const pauseOffset = this.paused ? (Date.now() - this.pausedAt) : 0;
+    return Math.floor((Date.now() - this.startTime - this.totalPausedMs - pauseOffset) / 1000);
+  }
+
+  pauseTracking() {
+    if (this.paused) return;
+    this.paused = true;
+    this.pausedAt = Date.now();
+  }
+
+  resumeTracking() {
+    if (!this.paused) return;
+    this.paused = false;
+    this.totalPausedMs += Date.now() - this.pausedAt;
+  }
 
   stats$ = new BehaviorSubject<LiveStats>({
     running: false, duration: 0, distance: 0, steps: 0,
@@ -52,6 +72,9 @@ export class TrackingService {
 
   startTracking(type: 'walk' | 'run') {
     this.startTime = Date.now();
+    this.pausedAt = 0;
+    this.totalPausedMs = 0;
+    this.paused = false;
     this.lastPos = null;
     this.speedSamples = [];
     this.stats$.next({
@@ -61,8 +84,9 @@ export class TrackingService {
     });
 
     this.timerInterval = setInterval(() => {
+      if (this.paused) return;
       const s = this.stats$.value;
-      this.stats$.next({ ...s, duration: Math.floor((Date.now() - this.startTime) / 1000) });
+      this.stats$.next({ ...s, duration: this.elapsedSeconds() });
     }, 1000);
 
     this.watchId = navigator.geolocation.watchPosition(
@@ -73,6 +97,7 @@ export class TrackingService {
   }
 
   private onPosition(pos: GeolocationPosition, type: 'walk' | 'run') {
+    if (this.paused) return;
     const s = this.stats$.value;
     const { latitude: lat, longitude: lng, speed } = pos.coords;
     const speedKmh = speed != null ? speed * 3.6 : 0;

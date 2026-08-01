@@ -7,14 +7,9 @@ import { Subscription } from 'rxjs';
 import * as L from 'leaflet';
 
 type ActivityType = 'walk' | 'run' | 'other';
+interface ActivityOption { type: ActivityType; icon: string; label: string; desc: string; available: boolean; }
 
-interface ActivityOption {
-  type: ActivityType;
-  icon: string;
-  label: string;
-  desc: string;
-  available: boolean;
-}
+const HOLD_MS = 3000;
 
 @Component({
   selector: 'app-tracker',
@@ -22,21 +17,15 @@ interface ActivityOption {
   imports: [CommonModule],
   template: `
     <div class="page-container tracker-page">
-      <!-- Header -->
       <header class="tracker-header glass">
         <div class="header-center">
           <h2>{{ isRunning() ? (isPaused() ? '⏸ Paused' : '🔴 Live Tracking') : '🏃 Tracker' }}</h2>
-          @if (isRunning()) {
-            <div class="live-badge">
-              <span class="live-dot"></span>
-              LIVE
-            </div>
+          @if (isRunning() && !isPaused()) {
+            <div class="live-badge"><span class="live-dot"></span>LIVE</div>
           }
         </div>
-
       </header>
 
-      <!-- Map -->
       <div class="map-section">
         <div #mapEl class="map-container"></div>
         @if (!isRunning() && !hasRoute()) {
@@ -49,15 +38,12 @@ interface ActivityOption {
         }
       </div>
 
-      <!-- Stats panel -->
       <div class="stats-panel glass">
-        <!-- Timer -->
         <div class="timer-display">
           <span class="timer-value">{{ formatTime(stats().duration) }}</span>
           <span class="timer-label">Duration</span>
         </div>
 
-        <!-- Main stats grid -->
         <div class="live-stats-grid">
           @for (stat of liveStats(); track stat.label) {
             <div class="live-stat" [class.highlight]="stat.highlight">
@@ -67,7 +53,6 @@ interface ActivityOption {
           }
         </div>
 
-        <!-- Speed indicator -->
         @if (isRunning()) {
           <div class="speed-bar-wrap">
             <div class="speed-bar-label">
@@ -80,7 +65,6 @@ interface ActivityOption {
           </div>
         }
 
-        <!-- Controls -->
         <div class="controls">
           @if (!isRunning()) {
             <button class="activity-picker-btn" (click)="showPicker.set(true)">
@@ -96,18 +80,29 @@ interface ActivityOption {
             </button>
           } @else {
             <div class="running-controls">
-              <button class="btn btn-secondary btn-icon-lg" (click)="togglePause()">
-                {{ isPaused() ? '▶️' : '⏸️' }}
+              <button class="pause-hold-btn"
+                [class.paused]="isPaused()"
+                [class.holding]="isHolding()"
+                (click)="onTap()"
+                (mousedown)="holdStart($event)"
+                (mouseup)="holdEnd()"
+                (mouseleave)="holdEnd()"
+                (touchstart)="holdStart($event)"
+                (touchend)="holdEnd()"
+                (touchcancel)="holdEnd()">
+                <svg class="hold-ring" viewBox="0 0 56 56">
+                  <circle class="ring-bg" cx="28" cy="28" r="24"/>
+                  <circle class="ring-fill" cx="28" cy="28" r="24"
+                    [style.stroke-dashoffset]="ringOffset()"/>
+                </svg>
+                <span class="pause-icon">{{ isPaused() ? '▶' : '⏸' }}</span>
               </button>
-              <button class="btn btn-danger stop-btn" (click)="stop()">
-                ⏹ Stop & Save
-              </button>
+              <p class="hold-hint">{{ isPaused() ? 'Hold 3s to stop & save' : 'Tap to pause' }}</p>
             </div>
           }
         </div>
       </div>
 
-      <!-- Activity Picker Modal -->
       @if (showPicker()) {
         <div class="modal-backdrop" (click)="showPicker.set(false)">
           <div class="modal-sheet glass" (click)="$event.stopPropagation()">
@@ -138,7 +133,6 @@ interface ActivityOption {
         </div>
       }
 
-      <!-- Saving overlay -->
       @if (saving()) {
         <div class="saving-overlay">
           <div class="saving-card glass">
@@ -150,241 +144,154 @@ interface ActivityOption {
     </div>
   `,
   styles: [`
-    .tracker-page {
-      display: flex;
-      flex-direction: column;
-      height: 100dvh;
-    }
+    .tracker-page { display: flex; flex-direction: column; height: 100dvh; }
 
     .tracker-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
+      display: flex; align-items: center; justify-content: space-between;
       padding: 14px 20px;
       padding-top: calc(14px + env(safe-area-inset-top, 0));
-      border-bottom: 1px solid var(--border);
-      flex-shrink: 0;
+      border-bottom: 1px solid var(--border); flex-shrink: 0;
     }
 
     .header-center {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      flex: 1;
-      justify-content: center;
+      display: flex; align-items: center; gap: 10px; flex: 1; justify-content: center;
       h2 { font-size: 18px; font-weight: 700; }
     }
 
     .live-badge {
-      display: flex;
-      align-items: center;
-      gap: 5px;
-      background: rgba(255,71,87,0.2);
-      border: 1px solid rgba(255,71,87,0.4);
-      border-radius: 20px;
-      padding: 4px 10px;
-      font-size: 11px;
-      font-weight: 700;
-      color: #FF4757;
-      letter-spacing: 1px;
+      display: flex; align-items: center; gap: 5px;
+      background: rgba(255,71,87,0.2); border: 1px solid rgba(255,71,87,0.4);
+      border-radius: 20px; padding: 4px 10px;
+      font-size: 11px; font-weight: 700; color: #FF4757; letter-spacing: 1px;
     }
 
     .live-dot {
-      width: 6px; height: 6px;
-      background: #FF4757;
-      border-radius: 50%;
-      animation: blink 1s infinite;
+      width: 6px; height: 6px; background: #FF4757;
+      border-radius: 50%; animation: blink 1s infinite;
     }
 
-
-    .map-section {
-      flex: 1;
-      position: relative;
-      min-height: 0;
-    }
-
-    .map-container {
-      width: 100%;
-      height: 100%;
-      z-index: 1;
-    }
+    .map-section { flex: 1; position: relative; min-height: 0; }
+    .map-container { width: 100%; height: 100%; z-index: 1; }
 
     .map-overlay {
-      position: absolute;
-      inset: 0;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      background: rgba(15,15,26,0.7);
-      z-index: 2;
-      pointer-events: none;
+      position: absolute; inset: 0; display: flex; align-items: center;
+      justify-content: center; background: rgba(15,15,26,0.7); z-index: 2; pointer-events: none;
     }
 
     .map-overlay-content {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 8px;
-      color: var(--text2);
+      display: flex; flex-direction: column; align-items: center; gap: 8px; color: var(--text2);
       .map-icon { font-size: 48px; }
       p { font-size: 14px; }
     }
 
     .stats-panel {
-      flex-shrink: 0;
-      padding: 16px 20px;
+      flex-shrink: 0; padding: 16px 20px;
       padding-bottom: calc(var(--nav-height) + 16px);
       border-top: 1px solid var(--border);
-      display: flex;
-      flex-direction: column;
-      gap: 14px;
+      display: flex; flex-direction: column; gap: 14px;
       border-radius: 24px 24px 0 0;
     }
 
-    .timer-display {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 2px;
-    }
+    .timer-display { display: flex; flex-direction: column; align-items: center; gap: 2px; }
 
     .timer-value {
-      font-size: 42px;
-      font-weight: 800;
-      font-family: 'Space Grotesk', sans-serif;
-      letter-spacing: -1px;
+      font-size: 42px; font-weight: 800;
+      font-family: 'Space Grotesk', sans-serif; letter-spacing: -1px;
       background: linear-gradient(135deg, var(--text), var(--primary-light));
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
     }
 
     .timer-label { font-size: 12px; color: var(--text2); font-weight: 500; }
 
-    .live-stats-grid {
-      display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: 8px;
-    }
+    .live-stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
 
     .live-stat {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 4px;
-      background: var(--card);
-      border-radius: var(--radius-sm);
-      padding: 10px 6px;
-      border: 1px solid var(--border);
-      transition: all 0.3s;
-
-      &.highlight {
-        background: rgba(108,99,255,0.1);
-        border-color: rgba(108,99,255,0.3);
-      }
+      display: flex; flex-direction: column; align-items: center; gap: 4px;
+      background: var(--card); border-radius: var(--radius-sm);
+      padding: 10px 6px; border: 1px solid var(--border); transition: all 0.3s;
+      &.highlight { background: rgba(108,99,255,0.1); border-color: rgba(108,99,255,0.3); }
     }
 
     .live-stat-value {
-      font-size: 15px;
-      font-weight: 700;
-      font-family: 'Space Grotesk', sans-serif;
-      animation: countUp 0.3s ease;
+      font-size: 15px; font-weight: 700;
+      font-family: 'Space Grotesk', sans-serif; animation: countUp 0.3s ease;
     }
 
     .live-stat-label { font-size: 10px; color: var(--text2); font-weight: 500; text-align: center; }
 
     .speed-bar-wrap { display: flex; flex-direction: column; gap: 6px; }
-
-    .speed-bar-label {
-      display: flex;
-      justify-content: space-between;
-      font-size: 12px;
-      color: var(--text2);
-    }
-
+    .speed-bar-label { display: flex; justify-content: space-between; font-size: 12px; color: var(--text2); }
     .speed-val { color: var(--primary-light); font-weight: 600; }
-
-    .speed-bar {
-      height: 6px;
-      background: var(--card2);
-      border-radius: 3px;
-      overflow: hidden;
-    }
-
+    .speed-bar { height: 6px; background: var(--card2); border-radius: 3px; overflow: hidden; }
     .speed-fill {
-      height: 100%;
-      background: linear-gradient(90deg, var(--primary), var(--secondary));
-      border-radius: 3px;
-      transition: width 0.5s ease;
-      min-width: 4px;
+      height: 100%; background: linear-gradient(90deg, var(--primary), var(--secondary));
+      border-radius: 3px; transition: width 0.5s ease; min-width: 4px;
     }
 
     .controls { display: flex; flex-direction: column; gap: 10px; }
 
-    /* Activity picker button */
     .activity-picker-btn {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      background: var(--card);
-      border: 1px solid var(--border);
-      border-radius: var(--radius-sm);
-      padding: 12px 14px;
-      cursor: pointer;
-      width: 100%;
-      text-align: left;
-      transition: all 0.2s;
-      color: var(--text);
-
+      display: flex; align-items: center; gap: 12px;
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: var(--radius-sm); padding: 12px 14px;
+      cursor: pointer; width: 100%; text-align: left; transition: all 0.2s; color: var(--text);
       &:active { background: var(--card2); transform: scale(0.99); }
     }
 
     .picker-icon { font-size: 26px; }
-
-    .picker-info {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      gap: 2px;
-    }
-
+    .picker-info { flex: 1; display: flex; flex-direction: column; gap: 2px; }
     .picker-label { font-size: 15px; font-weight: 600; }
     .picker-sub { font-size: 11px; color: var(--text2); }
     .picker-chevron { font-size: 22px; color: var(--text3); }
-
     .start-btn { width: 100%; }
 
+    /* ── Single pause/hold button ── */
     .running-controls {
-      display: flex;
-      gap: 12px;
-      align-items: center;
+      display: flex; flex-direction: column; align-items: center; gap: 8px;
     }
 
-    .btn-icon-lg {
-      width: 56px; height: 56px;
-      border-radius: 50%;
-      font-size: 22px;
-      flex-shrink: 0;
-      padding: 0;
+    .pause-hold-btn {
+      position: relative; width: 80px; height: 80px;
+      border-radius: 50%; border: none;
+      background: var(--card2);
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      user-select: none; -webkit-user-select: none;
+      transition: background 0.2s, transform 0.1s;
+      &:active { transform: scale(0.95); }
+      &.paused { background: rgba(108,99,255,0.15); }
+      &.holding .ring-fill { stroke: #FF4757 !important; }
     }
 
-    .stop-btn { flex: 1; }
+    .hold-ring {
+      position: absolute; inset: 0; width: 100%; height: 100%;
+      transform: rotate(-90deg); pointer-events: none;
+    }
 
-    /* Modal */
+    .ring-bg { fill: none; stroke: var(--border); stroke-width: 3; }
+
+    .ring-fill {
+      fill: none; stroke: var(--primary); stroke-width: 3;
+      stroke-linecap: round;
+      stroke-dasharray: 150.796;
+      transition: stroke-dashoffset 0.05s linear, stroke 0.3s;
+    }
+
+    .pause-icon {
+      font-size: 26px; position: relative; z-index: 1;
+      pointer-events: none; line-height: 1;
+    }
+
+    .hold-hint { font-size: 11px; color: var(--text3); font-weight: 500; }
+
     .modal-backdrop {
-      position: fixed;
-      inset: 0;
-      background: rgba(0,0,0,0.6);
-      z-index: 2000;
-      display: flex;
-      align-items: flex-end;
-      backdrop-filter: blur(4px);
-      animation: fadeIn 0.2s ease;
+      position: fixed; inset: 0; background: rgba(0,0,0,0.6);
+      z-index: 2000; display: flex; align-items: flex-end;
+      backdrop-filter: blur(4px); animation: fadeIn 0.2s ease;
     }
 
     .modal-sheet {
-      width: 100%;
-      border-radius: 24px 24px 0 0;
+      width: 100%; border-radius: 24px 24px 0 0;
       padding: 12px 20px 40px;
       animation: slideUp 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
     }
@@ -395,110 +302,51 @@ interface ActivityOption {
     }
 
     .modal-handle {
-      width: 40px; height: 4px;
-      background: var(--border);
-      border-radius: 2px;
-      margin: 0 auto 16px;
+      width: 40px; height: 4px; background: var(--border);
+      border-radius: 2px; margin: 0 auto 16px;
     }
 
-    .modal-title {
-      font-size: 18px;
-      font-weight: 700;
-      margin-bottom: 16px;
-      text-align: center;
-    }
-
-    .activity-options {
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-    }
+    .modal-title { font-size: 18px; font-weight: 700; margin-bottom: 16px; text-align: center; }
+    .activity-options { display: flex; flex-direction: column; gap: 10px; }
 
     .activity-opt {
-      display: flex;
-      align-items: center;
-      gap: 14px;
-      background: var(--card);
-      border: 1px solid var(--border);
-      border-radius: var(--radius-sm);
-      padding: 14px 16px;
-      cursor: pointer;
-      text-align: left;
-      transition: all 0.2s;
-      color: var(--text);
-      width: 100%;
-
-      &.selected {
-        border-color: var(--primary);
-        background: rgba(108,99,255,0.1);
-      }
-
-      &.disabled {
-        opacity: 0.5;
-        cursor: not-allowed;
-      }
-
+      display: flex; align-items: center; gap: 14px;
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: var(--radius-sm); padding: 14px 16px;
+      cursor: pointer; text-align: left; transition: all 0.2s; color: var(--text); width: 100%;
+      &.selected { border-color: var(--primary); background: rgba(108,99,255,0.1); }
+      &.disabled { opacity: 0.5; cursor: not-allowed; }
       &:not(.disabled):active { transform: scale(0.98); }
     }
 
     .opt-icon { font-size: 28px; }
-
-    .opt-info {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      gap: 3px;
-    }
-
+    .opt-info { flex: 1; display: flex; flex-direction: column; gap: 3px; }
     .opt-label { font-size: 15px; font-weight: 600; }
     .opt-desc { font-size: 12px; color: var(--text2); }
 
     .opt-check {
-      width: 24px; height: 24px;
-      border-radius: 50%;
+      width: 24px; height: 24px; border-radius: 50%;
       border: 2px solid var(--border);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 13px;
-      transition: all 0.2s;
-
-      &.checked {
-        background: var(--primary);
-        border-color: var(--primary);
-        color: white;
-      }
+      display: flex; align-items: center; justify-content: center;
+      font-size: 13px; transition: all 0.2s;
+      &.checked { background: var(--primary); border-color: var(--primary); color: white; }
     }
 
     .coming-soon-badge {
-      background: rgba(255,101,132,0.15);
-      border: 1px solid rgba(255,101,132,0.3);
-      color: var(--secondary);
-      border-radius: 20px;
-      padding: 3px 10px;
-      font-size: 11px;
-      font-weight: 700;
+      background: rgba(255,101,132,0.15); border: 1px solid rgba(255,101,132,0.3);
+      color: var(--secondary); border-radius: 20px;
+      padding: 3px 10px; font-size: 11px; font-weight: 700;
     }
 
-    /* Saving overlay */
     .saving-overlay {
-      position: fixed;
-      inset: 0;
-      background: rgba(0,0,0,0.7);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      z-index: 9999;
-      backdrop-filter: blur(10px);
+      position: fixed; inset: 0; background: rgba(0,0,0,0.7);
+      display: flex; align-items: center; justify-content: center;
+      z-index: 9999; backdrop-filter: blur(10px);
     }
 
     .saving-card {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 16px;
-      padding: 32px 48px;
-      border-radius: var(--radius);
+      display: flex; flex-direction: column; align-items: center;
+      gap: 16px; padding: 32px 48px; border-radius: var(--radius);
       p { color: var(--text2); font-size: 15px; }
     }
   `]
@@ -511,6 +359,9 @@ export class TrackerComponent implements OnInit, OnDestroy, AfterViewInit {
   saving = signal(false);
   showPicker = signal(false);
   actType = signal<ActivityType>('walk');
+  isHolding = signal(false);
+  ringOffset = signal(150.796);
+  private holdCompleted = false;
 
   stats = signal<LiveStats>({
     running: false, duration: 0, distance: 0, steps: 0,
@@ -530,13 +381,11 @@ export class TrackerComponent implements OnInit, OnDestroy, AfterViewInit {
   private routeLine!: L.Polyline;
   private posMarker!: L.CircleMarker;
   private sub!: Subscription;
+  private holdTimer: any = null;
+  private holdInterval: any = null;
+  private holdStartTime = 0;
 
-  constructor(
-    private tracking: TrackingService,
-    private router: Router,
-    private zone: NgZone,
-    private keepAlive: BackgroundKeepAliveService
-  ) {}
+  constructor(private tracking: TrackingService, private router: Router, private zone: NgZone, private keepAlive: BackgroundKeepAliveService) {}
 
   ngOnInit() {
     this.sub = this.tracking.stats$.subscribe(s => {
@@ -548,39 +397,90 @@ export class TrackerComponent implements OnInit, OnDestroy, AfterViewInit {
     });
   }
 
-  ngAfterViewInit() {
-    setTimeout(() => this.initMap(), 100);
-  }
+  ngAfterViewInit() { setTimeout(() => this.initMap(), 100); }
 
   ngOnDestroy() {
     this.sub?.unsubscribe();
     if (this.map) this.map.remove();
     this.keepAlive.stop();
+    this.clearHold();
+  }
+
+  holdStart(e: Event) {
+    e.preventDefault();
+    if (!this.isRunning() || !this.isPaused()) return;
+    this.holdStartTime = Date.now();
+    this.isHolding.set(true);
+    this.ringOffset.set(150.796);
+
+    this.holdInterval = setInterval(() => {
+      const elapsed = Date.now() - this.holdStartTime;
+      const progress = Math.min(elapsed / HOLD_MS, 1);
+      this.ringOffset.set(150.796 * (1 - progress));
+    }, 50);
+
+    this.holdTimer = setTimeout(() => {
+      this.holdCompleted = true;
+      this.clearHold();
+      this.stop();
+    }, HOLD_MS);
+  }
+
+  holdEnd() {
+    if (!this.isHolding()) return;
+    const elapsed = Date.now() - this.holdStartTime;
+    this.clearHold();
+    if (!this.holdCompleted && elapsed < 400) {
+      this.togglePause();
+    }
+    this.holdCompleted = false;
+  }
+
+  private clearHold() {
+    clearTimeout(this.holdTimer);
+    clearInterval(this.holdInterval);
+    this.holdTimer = null;
+    this.holdInterval = null;
+    this.isHolding.set(false);
+    this.ringOffset.set(150.796);
+  }
+
+  onTap() {
+    // While running: tap = pause (hold not involved)
+    // While paused: tap = resume (hold handles stop)
+    if (!this.isPaused()) {
+      this.isPaused.set(true);
+      this.tracking.pauseTracking();
+    } else if (!this.holdCompleted) {
+      this.isPaused.set(false);
+      this.tracking.resumeTracking();
+    }
+  }
+
+  togglePause() {
+    if (this.isPaused()) {
+      this.isPaused.set(false);
+      this.tracking.resumeTracking();
+    } else {
+      this.isPaused.set(true);
+      this.tracking.pauseTracking();
+    }
   }
 
   private initMap() {
     this.map = L.map(this.mapEl.nativeElement, {
-      center: [20, 0], zoom: 2,
-      zoomControl: false,
-      attributionControl: false
+      center: [20, 0], zoom: 2, zoomControl: false, attributionControl: false
     });
-
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution: '© OpenStreetMap'
     }).addTo(this.map);
-
     L.control.attribution({ position: 'bottomright', prefix: false }).addTo(this.map);
-
     this.routeLine = L.polyline([], {
-      color: '#6C63FF', weight: 5, opacity: 0.9,
-      lineCap: 'round', lineJoin: 'round'
+      color: '#6C63FF', weight: 5, opacity: 0.9, lineCap: 'round', lineJoin: 'round'
     }).addTo(this.map);
-
     this.posMarker = L.circleMarker([0, 0], {
-      radius: 10, color: '#6C63FF', fillColor: '#fff',
-      fillOpacity: 1, weight: 3
+      radius: 10, color: '#6C63FF', fillColor: '#fff', fillOpacity: 1, weight: 3
     }).addTo(this.map);
-
     navigator.geolocation.getCurrentPosition(pos => {
       const { latitude, longitude } = pos.coords;
       this.map.setView([latitude, longitude], 16);
@@ -591,8 +491,7 @@ export class TrackerComponent implements OnInit, OnDestroy, AfterViewInit {
     if (!s.currentPos) return;
     const latlng: L.LatLngExpression = [s.currentPos.lat, s.currentPos.lng];
     this.posMarker.setLatLng(latlng);
-    const points: L.LatLngExpression[] = s.route.map(p => [p.lat, p.lng]);
-    this.routeLine.setLatLngs(points);
+    this.routeLine.setLatLngs(s.route.map(p => [p.lat, p.lng] as L.LatLngExpression));
     if (s.route.length > 1) {
       this.map.panTo(latlng, { animate: true, duration: 0.5 });
     } else {
@@ -611,16 +510,12 @@ export class TrackerComponent implements OnInit, OnDestroy, AfterViewInit {
     this.routeLine?.setLatLngs([]);
     this.tracking.startTracking(this.actType() as 'walk' | 'run');
     this.isRunning.set(true);
-    // Start silent audio session so iOS/Android keep JS running when screen turns off
     this.keepAlive.start();
-  }
-
-  togglePause() {
-    this.isPaused.set(!this.isPaused());
   }
 
   async stop() {
     this.saving.set(true);
+    this.isPaused.set(false);
     this.keepAlive.stop();
     try {
       const id = await this.tracking.stopTracking(this.actType() as 'walk' | 'run');

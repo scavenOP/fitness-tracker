@@ -150,10 +150,14 @@ jobs:
           keytool -printcert -jarfile mobile-app/android/app/build/outputs/apk/debug/app-debug.apk 2>&1 | grep "SHA1:"
 
       - name: Create APK output directory
-        run: mkdir -p APK
+        run: |
+          mkdir -p APK
+          mkdir -p src/assets
 
       - name: Copy and rename APK
-        run: cp "mobile-app/android/app/build/outputs/apk/debug/app-debug.apk" "APK/Fitly.apk"
+        run: |
+          cp "mobile-app/android/app/build/outputs/apk/debug/app-debug.apk" "APK/Fitly.apk"
+          cp "mobile-app/android/app/build/outputs/apk/debug/app-debug.apk" "src/assets/Fitly.apk"
 
       - name: Upload APK as artifact
         uses: actions/upload-artifact@v4
@@ -166,7 +170,7 @@ jobs:
         with:
           commit_message: "Build: Update Fitly.apk"
           branch: main
-          file_pattern: 'APK/Fitly.apk'
+          file_pattern: 'APK/Fitly.apk src/assets/Fitly.apk'
           add_options: '-f'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

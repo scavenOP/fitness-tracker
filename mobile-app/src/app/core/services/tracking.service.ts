@@ -51,6 +51,9 @@ export class TrackingService {
   private watchId: number | null = null;
   private timerInterval: any = null;
   private startTime = 0;
+  private pausedAt = 0;
+  private totalPausedMs = 0;
+  private isPaused = false;
   private lastPos: { lat: number; lng: number } | null = null;
   private speedSamples: number[] = [];
   private activityType: 'walk' | 'run' = 'walk';
@@ -64,9 +67,29 @@ export class TrackingService {
     route: [], currentPos: null
   });
 
+  pauseTracking() {
+    if (this.isPaused) return;
+    this.isPaused = true;
+    this.pausedAt = Date.now();
+  }
+
+  resumeTracking() {
+    if (!this.isPaused) return;
+    this.isPaused = false;
+    this.totalPausedMs += Date.now() - this.pausedAt;
+  }
+
+  private elapsedSeconds(): number {
+    const pauseOffset = this.isPaused ? (Date.now() - this.pausedAt) : 0;
+    return Math.floor((Date.now() - this.startTime - this.totalPausedMs - pauseOffset) / 1000);
+  }
+
   async startTracking(type: 'walk' | 'run') {
     this.activityType = type;
     this.startTime = Date.now();
+    this.pausedAt = 0;
+    this.totalPausedMs = 0;
+    this.isPaused = false;
     this.lastPos = null;
     this.speedSamples = [];
     this.stats$.next({
@@ -79,19 +102,19 @@ export class TrackingService {
     await this.showLiveNotification(type);
 
     if (this.isNative) {
-      // On native: timer runs inside the BG geolocation callback (survives background)
-      // Also start a fallback interval for duration-only updates when GPS hasn't fired
       this.timerInterval = setInterval(() => {
+        if (this.isPaused) return;
         const s = this.stats$.value;
-        const newDuration = Math.floor((Date.now() - this.startTime) / 1000);
+        const newDuration = this.elapsedSeconds();
         this.zone.run(() => this.stats$.next({ ...s, duration: newDuration }));
         if (newDuration % 5 === 0) this.updateLiveNotification({ ...s, duration: newDuration });
       }, 1000);
       await this.startNativeTracking(type);
     } else {
       this.timerInterval = setInterval(() => {
+        if (this.isPaused) return;
         const s = this.stats$.value;
-        const newDuration = Math.floor((Date.now() - this.startTime) / 1000);
+        const newDuration = this.elapsedSeconds();
         this.stats$.next({ ...s, duration: newDuration });
         if (newDuration % 5 === 0) this.updateLiveNotification({ ...s, duration: newDuration });
       }, 1000);
@@ -126,9 +149,9 @@ export class TrackingService {
         },
         (location: any, error: any) => {
           if (error) { console.error(error); return; }
+          if (this.isPaused) return;
           this.zone.run(() => {
             this.onPosition(location.latitude, location.longitude, location.speed, type);
-            // Update notification on every GPS fix (already silent channel)
             const s = this.stats$.value;
             this.updateLiveNotification(s);
           });
@@ -141,9 +164,10 @@ export class TrackingService {
   }
 
   private onPosition(lat: number, lng: number, speed: number | null, type: 'walk' | 'run') {
+    if (this.isPaused) return;
     const s = this.stats$.value;
     const speedKmh = speed != null && speed > 0 ? speed * 3.6 : 0;
-    const duration = Math.floor((Date.now() - this.startTime) / 1000);
+    const duration = this.elapsedSeconds();
 
     let addedDist = 0;
     if (this.lastPos) {

@@ -598,7 +598,7 @@ export class LandingComponent implements OnInit {
   downloading = signal(false);
   showToast = signal(false);
 
-  readonly APK_URL = 'https://github.com/Ahsaniss/fitness-tracker/raw/main/APK/Fitly.apk';
+  readonly APK_URL = '/assets/Fitly.apk';
 
   particles: { id: number; style: string }[] = [];
 
