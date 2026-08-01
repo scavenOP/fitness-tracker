@@ -124,17 +124,25 @@ jobs:
           mkdir -p $HOME/.android
           if [ -n "${{ secrets.DEBUG_KEYSTORE_BASE64 }}" ]; then
             echo "${{ secrets.DEBUG_KEYSTORE_BASE64 }}" | base64 -d > $HOME/.android/debug.keystore
-            echo "✅ Using fixed keystore from secret"
-          else
+            # Verify it decoded correctly
+            FILESIZE=$(stat -c%s "$HOME/.android/debug.keystore")
+            echo "Keystore file size: $FILESIZE bytes"
+            if [ "$FILESIZE" -lt 100 ]; then
+              echo "⚠️ Keystore too small - secret is corrupted, regenerating..."
+              rm $HOME/.android/debug.keystore
+            else
+              echo "✅ Using fixed keystore from secret"
+            fi
+          fi
+          if [ ! -f "$HOME/.android/debug.keystore" ]; then
             keytool -genkeypair -v \
               -keystore $HOME/.android/debug.keystore \
               -alias androiddebugkey \
               -keyalg RSA -keysize 2048 -validity 10000 \
               -storepass android -keypass android \
               -dname "CN=Android Debug,O=Android,C=US"
-            echo "⚠️ SECRET NOT SET — generated a new keystore"
             echo "================================================"
-            echo "  COPY THIS BASE64 → add as GitHub secret DEBUG_KEYSTORE_BASE64"
+            echo "COPY THIS FULL BASE64 → save as GitHub secret DEBUG_KEYSTORE_BASE64"
             echo "================================================"
             base64 -w 0 $HOME/.android/debug.keystore
             echo ""
@@ -149,8 +157,7 @@ jobs:
 
       - name: Print SHA-1 fingerprint
         run: |
-          keytool -list -v -keystore $HOME/.android/debug.keystore -storepass android || true
-          keytool -list -v -keystore $HOME/.android/debug.keystore -storepass android 2>&1 || true
+          keytool -list -v -keystore $HOME/.android/debug.keystore -storepass android 2>&1 | grep -E "SHA1:|SHA-1:" || keytool -list -v -keystore $HOME/.android/debug.keystore -storepass android 2>&1
 
       - name: Create APK output directory
         run: mkdir -p APK
