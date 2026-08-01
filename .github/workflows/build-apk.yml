@@ -152,9 +152,8 @@ jobs:
           echo "================================================"
           echo "         DEBUG KEYSTORE SHA-1 FINGERPRINT"
           echo "================================================"
-          keytool -list -v -keystore $HOME/.android/debug.keystore -alias androiddebugkey -storepass android 2>&1 | grep "SHA1:"
+          keytool -list -v -keystore $HOME/.android/debug.keystore -storepass android 2>&1 | grep "SHA1:"
           echo "================================================"
-        working-directory: mobile-app/android
 
       - name: Create APK output directory
         run: mkdir -p APK
