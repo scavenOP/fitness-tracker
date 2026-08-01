@@ -44,7 +44,6 @@ jobs:
       - name: Remove existing Android platform if present
         run: |
           if [ -d "mobile-app/android" ]; then
-            echo "Removing existing android folder..."
             rm -rf mobile-app/android
           fi
 
@@ -79,40 +78,24 @@ jobs:
           })).then(() => console.log('Icons generated')).catch(e => { console.error(e); process.exit(1); });
           "
 
-      - name: Remove adaptive icon XMLs and replace with plain PNG icons
+      - name: Remove adaptive icon XMLs
         run: |
           BASE="mobile-app/android/app/src/main/res"
-
-          # Delete all adaptive icon XML files that override our PNG
           find "$BASE" -name "ic_launcher.xml" -delete
           find "$BASE" -name "ic_launcher_round.xml" -delete
           find "$BASE" -name "ic_launcher_background.xml" -delete
           find "$BASE" -name "ic_launcher_foreground.xml" -delete
-
-          # Delete mipmap-anydpi-v26 folder entirely (holds adaptive icon XMLs)
           rm -rf "$BASE/mipmap-anydpi-v26"
 
-          echo "Adaptive icon XMLs removed"
-
       - name: Update app name in strings.xml
-        run: |
-          STRINGS="mobile-app/android/app/src/main/res/values/strings.xml"
-          sed -i 's|<string name="app_name">.*</string>|<string name="app_name">Fitly</string>|' "$STRINGS"
+        run: sed -i 's|<string name="app_name">.*</string>|<string name="app_name">Fitly</string>|' "mobile-app/android/app/src/main/res/values/strings.xml"
 
       - name: Patch AndroidManifest.xml
         run: |
           MANIFEST="mobile-app/android/app/src/main/AndroidManifest.xml"
-
-          # Add xmlns:tools
           sed -i 's|xmlns:android="http://schemas.android.com/apk/res/android"|xmlns:android="http://schemas.android.com/apk/res/android" xmlns:tools="http://schemas.android.com/tools"|' "$MANIFEST"
-
-          # Add permissions before <application (skip INTERNET - Capacitor adds it)
           sed -i 's|<application|<uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />\n    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />\n    <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />\n    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />\n    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />\n    <uses-permission android:name="android.permission.WAKE_LOCK" />\n    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />\n    <application|' "$MANIFEST"
-
-          # Add deep link intent filter for Google OAuth redirect
           sed -i 's|</activity>|            <intent-filter android:autoVerify="true">\n                <action android:name="android.intent.action.VIEW" />\n                <category android:name="android.intent.category.DEFAULT" />\n                <category android:name="android.intent.category.BROWSABLE" />\n                <data android:scheme="https" android:host="fitly.app" />\n            </intent-filter>\n        </activity>|' "$MANIFEST"
-
-          # Add BackgroundGeolocation foreground service
           sed -i 's|</application>|        <service\n            android:name="com.equimaps.capacitor_background_geolocation.BackgroundGeolocationService"\n            android:enabled="true"\n            android:exported="true"\n            android:foregroundServiceType="location"\n            tools:replace="android:exported" />\n    </application>|' "$MANIFEST"
 
       - name: Sync web assets to Android
@@ -127,10 +110,8 @@ jobs:
             FILESIZE=$(stat -c%s "$HOME/.android/debug.keystore")
             echo "Keystore file size: $FILESIZE bytes"
             if [ "$FILESIZE" -lt 100 ]; then
-              echo "⚠️ Keystore too small - secret is corrupted, regenerating..."
+              echo "Keystore too small, regenerating..."
               rm $HOME/.android/debug.keystore
-            else
-              echo "✅ Using fixed keystore from secret"
             fi
           fi
           if [ ! -f "$HOME/.android/debug.keystore" ]; then
@@ -141,36 +122,13 @@ jobs:
               -storetype PKCS12 \
               -storepass android -keypass android \
               -dname "CN=Android Debug,O=Android,C=US"
-            echo "================================================"
-            echo "COPY THIS FULL BASE64 → save as GitHub secret DEBUG_KEYSTORE_BASE64"
-            echo "================================================"
+            echo "Save this as GitHub secret DEBUG_KEYSTORE_BASE64:"
             base64 -w 0 $HOME/.android/debug.keystore
             echo ""
-            echo "================================================"
           fi
-          # Patch Gradle to explicitly use our keystore for debug builds
-          cat > /tmp/patch_gradle.py << 'PYEOF'
-import sys
-path = 'mobile-app/android/app/build.gradle'
-gradle = open(path).read()
-if 'signingConfigs' not in gradle:
-    patch = ('\nsigningConfigs {\n'
-             '    debug {\n'
-             '        storeFile file(System.getProperty("user.home") + "/.android/debug.keystore")\n'
-             '        storePassword "android"\n'
-             '        keyAlias "androiddebugkey"\n'
-             '        keyPassword "android"\n'
-             '    }\n'
-             '}\n')
-    gradle = gradle.replace('android {', 'android {' + patch, 1)
-    gradle = gradle.replace('debug {', 'debug {\n            signingConfig signingConfigs.debug', 1)
-    open(path, 'w').write(gradle)
-    print('Gradle patched')
-else:
-    print('Gradle already patched')
-PYEOF
-          python3 /tmp/patch_gradle.py
-          echo "✅ Gradle patched to use fixed keystore"
+
+      - name: Patch build.gradle signing config
+        run: python3 scripts/patch_gradle.py
 
       - name: Make gradlew executable and build debug APK
         run: |
@@ -181,10 +139,9 @@ PYEOF
       - name: Print SHA-1 fingerprint
         run: |
           echo "=== KEYSTORE SHA-1 ==="
-          keytool -list -v -keystore $HOME/.android/debug.keystore -storepass android 2>&1 | grep -E "SHA1:"
+          keytool -list -v -keystore $HOME/.android/debug.keystore -storepass android 2>&1 | grep "SHA1:"
           echo "=== APK SIGNATURE SHA-1 ==="
-          keytool -printcert -jarfile mobile-app/android/app/build/outputs/apk/debug/app-debug.apk 2>&1 | grep -E "SHA1:"
-          echo "=== DONE ==="
+          keytool -printcert -jarfile mobile-app/android/app/build/outputs/apk/debug/app-debug.apk 2>&1 | grep "SHA1:"
 
       - name: Create APK output directory
         run: mkdir -p APK
