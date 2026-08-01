@@ -3,6 +3,8 @@ import { RouterOutlet, RouterLink, RouterLinkActive, Router, NavigationEnd } fro
 import { CommonModule } from '@angular/common';
 import { AuthService } from './core/services/auth.service';
 import { filter } from 'rxjs/operators';
+import { LocalNotifications } from '@capacitor/local-notifications';
+import { Capacitor } from '@capacitor/core';
 
 @Component({
   selector: 'app-root',
@@ -132,9 +134,23 @@ export class AppComponent implements OnInit {
 
   constructor(private router: Router, private auth: AuthService) {}
 
+  private async registerSilentChannel() {
+    if (!Capacitor.isNativePlatform()) return;
+    try {
+      await LocalNotifications.createChannel({
+        id: 'fittrack_live',
+        name: 'Live Tracking',
+        importance: 3,       // DEFAULT importance — shows but no sound
+        sound: undefined,    // no sound
+        vibration: false,
+        lights: false
+      });
+    } catch (_) {}
+  }
+
   ngOnInit() {
-    // Handle Google redirect result when app resumes after OAuth
     this.auth.handleRedirectResult();
+    this.registerSilentChannel();
 
     this.router.events.pipe(
       filter(e => e instanceof NavigationEnd)

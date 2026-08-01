@@ -350,7 +350,8 @@ export class AuthComponent {
     try {
       await this.auth.loginWithGoogle();
     } catch (e: any) {
-      this.error.set(this.parseError(e.code) + (e.code ? ` (${e.code})` : ''));
+      console.error('Google login error:', e?.code, e?.message, e);
+      this.error.set(this.parseError(e.code));
       this.googleLoading.set(false);
       this.loading.set(false);
     }

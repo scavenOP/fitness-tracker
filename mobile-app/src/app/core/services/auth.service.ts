@@ -1,7 +1,7 @@
 import { Injectable, inject, Injector, runInInjectionContext } from '@angular/core';
 import {
   Auth, signInWithEmailAndPassword, createUserWithEmailAndPassword,
-  signOut, user, updateProfile, signInWithRedirect, getRedirectResult,
+  signOut, user, updateProfile, signInWithRedirect, signInWithPopup, getRedirectResult,
   GoogleAuthProvider, browserLocalPersistence, setPersistence
 } from '@angular/fire/auth';
 import { Router } from '@angular/router';
@@ -49,25 +49,28 @@ export class AuthService {
   }
 
   async loginWithGoogle() {
+    const auth = this.auth;
     const provider = new GoogleAuthProvider();
     provider.setCustomParameters({ prompt: 'select_account' });
 
-    await runInInjectionContext(this.injector, () =>
-      setPersistence(this.auth, browserLocalPersistence)
-    );
+    await setPersistence(auth, browserLocalPersistence);
 
     if (Capacitor.isNativePlatform()) {
-      // Native: use redirect — popup doesn't work in Capacitor WebView
-      await runInInjectionContext(this.injector, () =>
-        signInWithRedirect(this.auth, provider)
-      );
+      await signInWithRedirect(auth, provider);
     } else {
-      // Web browser: use popup
-      const { signInWithPopup } = await import('@angular/fire/auth');
-      const result = await runInInjectionContext(this.injector, () =>
-        signInWithPopup(this.auth, provider)
-      );
-      if (result.user) this.router.navigate(['/dashboard']);
+      try {
+        const result = await signInWithPopup(auth, provider);
+        if (result.user) this.router.navigate(['/dashboard']);
+      } catch (popupError: any) {
+        console.error('Popup failed:', popupError?.code, popupError);
+        if (popupError?.code === 'auth/popup-blocked' ||
+            popupError?.code === 'auth/popup-closed-by-user' ||
+            popupError?.code === 'auth/cancelled-popup-request') {
+          await signInWithRedirect(auth, provider);
+        } else {
+          throw popupError;
+        }
+      }
     }
   }
 

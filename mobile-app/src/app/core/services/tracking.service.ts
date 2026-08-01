@@ -239,10 +239,11 @@ export class TrackingService {
           id: this.NOTIF_ID,
           title: `FitTrack Pro — ${type === 'run' ? '🏃 Running' : '🚶 Walking'}`,
           body: 'Starting... tap to open',
-          ongoing: true,          // Android: persistent, non-dismissible
+          ongoing: true,
           autoCancel: false,
           smallIcon: 'ic_stat_directions_run',
           iconColor: '#6C63FF',
+          channelId: 'fittrack_live',
           extra: { type }
         }]
       });
@@ -268,7 +269,8 @@ export class TrackingService {
           ongoing: true,
           autoCancel: false,
           smallIcon: 'ic_stat_directions_run',
-          iconColor: '#6C63FF'
+          iconColor: '#6C63FF',
+          channelId: 'fittrack_live'
         }]
       });
     } catch (_) {}
