@@ -1,7 +1,8 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, signal } from '@angular/core';
 import { RouterOutlet, RouterLink, RouterLinkActive, Router, NavigationEnd } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { AuthService } from './core/services/auth.service';
+import { LogService } from './core/services/log.service';
 import { filter } from 'rxjs/operators';
 import { LocalNotifications } from '@capacitor/local-notifications';
 import { Capacitor } from '@capacitor/core';
@@ -26,6 +27,26 @@ import { Capacitor } from '@capacitor/core';
           }
         </nav>
       }
+
+      <!-- Debug log overlay -->
+      @if (logOpen()) {
+        <div class="log-overlay">
+          <div class="log-toolbar">
+            <span>🪲 Debug Log ({{ logger.logs().length }})</span>
+            <button (click)="logger.clear()">Clear</button>
+            <button (click)="logOpen.set(false)">✕</button>
+          </div>
+          <div class="log-body">
+            @for (e of logger.logs(); track $index) {
+              <div class="log-entry" [class]="e.level">
+                <span class="log-time">{{ e.time }}</span>
+                <span class="log-msg">{{ e.msg }}</span>
+              </div>
+            }
+          </div>
+        </div>
+      }
+      <button class="log-fab" (click)="logOpen.set(!logOpen())">🪲</button>
     </div>
   `,
   styles: [`
@@ -101,6 +122,68 @@ import { Capacitor } from '@capacitor/core';
 
     .nav-label { font-size: 11px; font-weight: 600; letter-spacing: 0.3px; transition: color 0.3s; }
 
+    /* Debug log overlay */
+    .log-fab {
+      position: fixed;
+      bottom: 90px;
+      right: 16px;
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      background: rgba(0,0,0,0.6);
+      border: none;
+      font-size: 18px;
+      cursor: pointer;
+      z-index: 9999;
+      opacity: 0.5;
+    }
+
+    .log-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.92);
+      z-index: 10000;
+      display: flex;
+      flex-direction: column;
+      font-family: monospace;
+      font-size: 11px;
+    }
+
+    .log-toolbar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 12px;
+      background: #111;
+      color: #fff;
+      font-size: 13px;
+      span { flex: 1; }
+      button { background: #333; color: #fff; border: none; padding: 4px 10px; border-radius: 4px; cursor: pointer; }
+    }
+
+    .log-body {
+      flex: 1;
+      overflow-y: auto;
+      padding: 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .log-entry {
+      display: flex;
+      gap: 8px;
+      padding: 4px 6px;
+      border-radius: 4px;
+      word-break: break-all;
+      white-space: pre-wrap;
+      &.error { background: rgba(255,50,50,0.2); color: #ff6b6b; }
+      &.warn  { background: rgba(255,200,0,0.15); color: #ffd43b; }
+      &.info  { color: #a9e34b; }
+    }
+
+    .log-time { color: #888; flex-shrink: 0; }
+
     .nav-item:nth-child(2) {
       .nav-icon-wrap {
         background: linear-gradient(135deg, var(--primary), var(--secondary));
@@ -125,6 +208,7 @@ import { Capacitor } from '@capacitor/core';
 })
 export class AppComponent implements OnInit {
   showNav = false;
+  logOpen = signal(false);
 
   navItems = [
     { path: '/dashboard', label: 'Home', icon: '🏠' },
@@ -132,7 +216,7 @@ export class AppComponent implements OnInit {
     { path: '/history', label: 'History', icon: '📊' },
   ];
 
-  constructor(private router: Router, private auth: AuthService) {}
+  constructor(private router: Router, private auth: AuthService, public logger: LogService) {}
 
   private async registerSilentChannel() {
     if (!Capacitor.isNativePlatform()) return;

@@ -8,12 +8,14 @@ import { Router } from '@angular/router';
 import { Observable } from 'rxjs';
 import { Capacitor } from '@capacitor/core';
 import { App } from '@capacitor/app';
+import { LogService } from './log.service';
 
 @Injectable({ providedIn: 'root' })
 export class AuthService {
   private auth = inject(Auth);
   private router = inject(Router);
   private injector = inject(Injector);
+  private log = inject(LogService);
 
   user$: Observable<any> = user(this.auth);
 
@@ -60,12 +62,21 @@ export class AuthService {
     await setPersistence(this.auth, browserLocalPersistence);
 
     if (Capacitor.isNativePlatform()) {
-      const { GoogleAuth } = await import('@codetrix-studio/capacitor-google-auth');
-      await GoogleAuth.initialize();
-      const googleUser = await GoogleAuth.signIn();
-      const credential = GoogleAuthProvider.credential(googleUser.authentication.idToken);
-      const result = await signInWithCredential(this.auth, credential);
-      if (result.user) this.router.navigate(['/dashboard']);
+      try {
+        this.log.info('GoogleAuth: starting native sign-in');
+        const { GoogleAuth } = await import('@codetrix-studio/capacitor-google-auth');
+        await GoogleAuth.initialize();
+        this.log.info('GoogleAuth: initialized');
+        const googleUser = await GoogleAuth.signIn();
+        this.log.info('GoogleAuth: got user', googleUser?.email);
+        const credential = GoogleAuthProvider.credential(googleUser.authentication.idToken);
+        const result = await signInWithCredential(this.auth, credential);
+        this.log.info('Firebase signIn success', result.user?.email);
+        if (result.user) this.router.navigate(['/dashboard']);
+      } catch (e: any) {
+        this.log.error('GoogleAuth native error:', e?.code, e?.message, JSON.stringify(e));
+        throw e;
+      }
     } else {
       try {
         const result = await signInWithPopup(this.auth, provider);
