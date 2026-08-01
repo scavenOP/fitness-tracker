@@ -60,9 +60,8 @@ export class AuthService {
     await setPersistence(this.auth, browserLocalPersistence);
 
     if (Capacitor.isNativePlatform()) {
-      // Use @codetrix-studio/capacitor-google-auth for native —
-      // returns idToken directly, no redirect/domain needed
       const { GoogleAuth } = await import('@codetrix-studio/capacitor-google-auth');
+      await GoogleAuth.initialize();
       const googleUser = await GoogleAuth.signIn();
       const credential = GoogleAuthProvider.credential(googleUser.authentication.idToken);
       const result = await signInWithCredential(this.auth, credential);
