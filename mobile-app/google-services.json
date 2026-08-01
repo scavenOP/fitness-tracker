@@ -15,6 +15,14 @@
       },
       "oauth_client": [
         {
+          "client_id": "1011187607007-7brs7v07e7obs2k4pt4k1c5eibc5qlb8.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.fitly.app",
+            "certificate_hash": "ea0c8c3200fc39e8b22e0b62985b60ca7e4d5f17"
+          }
+        },
+        {
           "client_id": "1011187607007-9qr4i98mmptt9av5l8ufc7ff5m5af6aa.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {
